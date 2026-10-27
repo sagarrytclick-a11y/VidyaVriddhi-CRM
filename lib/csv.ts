@@ -1,4 +1,4 @@
-import { MAX_IMPORT_ROWS } from "@/lib/constants";
+import { MAX_IMPORT_ROWS, normalizeLeadSource } from "@/lib/constants";
 import { normalizePhoneNumber } from "@/lib/utils";
 
 export interface ParsedLeadRow {
@@ -6,6 +6,7 @@ export interface ParsedLeadRow {
   phoneNumber: string;
   cityState?: string;
   category?: string;
+  source?: string;
 }
 
 export interface ParseLeadResult {
@@ -83,6 +84,7 @@ function looksLikeHeader(cells: string[]): {
   phoneIndex: number;
   cityIndex: number;
   categoryIndex: number;
+  sourceIndex: number;
 } {
   const normalized = cells.map((cell) => cell.toLowerCase());
   const nameIndex = normalized.findIndex((cell) =>
@@ -97,6 +99,9 @@ function looksLikeHeader(cells: string[]): {
   const categoryIndex = normalized.findIndex((cell) =>
     /categor|segment|industry|vertical|business\s*type|lead\s*type/.test(cell),
   );
+  const sourceIndex = normalized.findIndex((cell) =>
+    /source|channel|platform|campaign|lead\s*from|coming\s*from/.test(cell),
+  );
 
   return {
     isHeader: nameIndex >= 0 && phoneIndex >= 0,
@@ -104,6 +109,7 @@ function looksLikeHeader(cells: string[]): {
     phoneIndex,
     cityIndex,
     categoryIndex,
+    sourceIndex,
   };
 }
 
@@ -150,6 +156,11 @@ export function parseLeadText(input: string): ParseLeadResult {
     : firstCells.length > 3
       ? 3
       : -1;
+  const sourceIndex = header.isHeader
+    ? header.sourceIndex
+    : firstCells.length > 4
+      ? 4
+      : -1;
 
   if (!header.isHeader && firstCells.length < 2) {
     nameIndex = -1;
@@ -174,6 +185,7 @@ export function parseLeadText(input: string): ParseLeadResult {
     let rawPhone = clean(cells[phoneIndex]);
     let cityState = cityIndex >= 0 ? clean(cells[cityIndex]) : "";
     let category = categoryIndex >= 0 ? clean(cells[categoryIndex]) : "";
+    let source = sourceIndex >= 0 ? clean(cells[sourceIndex]) : "";
 
     if (!businessName || !rawPhone || !isPhone(rawPhone)) {
       const loose = extractFromLooseLine(line);
@@ -185,9 +197,11 @@ export function parseLeadText(input: string): ParseLeadResult {
       rawPhone = loose.phoneNumber;
       cityState = "";
       category = "";
+      source = "";
     }
 
     const phoneNumber = normalizePhoneNumber(rawPhone);
+    const normalizedSource = normalizeLeadSource(source);
 
     if (!businessName || !isPhone(phoneNumber)) {
       skipped += 1;
@@ -199,6 +213,7 @@ export function parseLeadText(input: string): ParseLeadResult {
       phoneNumber,
       ...(cityState ? { cityState: cityState.slice(0, 200) } : {}),
       ...(category ? { category: category.slice(0, 100) } : {}),
+      ...(normalizedSource ? { source: normalizedSource } : {}),
     });
   }
 

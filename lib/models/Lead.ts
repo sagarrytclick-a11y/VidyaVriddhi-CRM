@@ -7,7 +7,7 @@ import {
   type Types,
 } from "mongoose";
 import type { LeadStatus, PaymentMode } from "@/lib/types";
-import { PAYMENT_MODES } from "@/lib/constants";
+import { LEAD_SOURCES, PAYMENT_MODES } from "@/lib/constants";
 
 const LEAD_STATUS_VALUES = [
   "NEW",
@@ -62,6 +62,8 @@ export interface ILead {
   phoneNumber: string;
   cityState?: string | null;
   category?: string | null;
+  /** Where the lead came from, e.g. "Google My Business" or "Meta Ads". */
+  source?: string | null;
   status: LeadStatus;
   assignedTo?: Types.ObjectId | null;
   followUpDate?: Date | null;
@@ -222,6 +224,12 @@ const leadSchema = new Schema<ILead>(
       type: String,
       trim: true,
       maxlength: 100,
+      default: null,
+      index: true,
+    },
+    source: {
+      type: String,
+      enum: LEAD_SOURCES,
       default: null,
       index: true,
     },

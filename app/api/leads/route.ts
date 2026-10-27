@@ -30,6 +30,7 @@ export async function GET(request: Request) {
       status: parsed.data.status,
       assigned: parsed.data.assigned,
       category: parsed.data.category,
+      source: parsed.data.source,
       payment: parsed.data.payment,
       page: parsed.data.page,
       pageSize: parsed.data.limit,

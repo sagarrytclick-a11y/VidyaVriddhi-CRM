@@ -7,6 +7,7 @@ import {
   CalendarClock,
   IndianRupee,
   MapPin,
+  Megaphone,
   MessageSquareText,
   MousePointerClick,
   Pencil,
@@ -204,6 +205,14 @@ export function NotesDrawer({
               <Tag className="h-3.5 w-3.5 text-slate-400" />
               <span className="inline-flex items-center rounded-md border border-slate-200 bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium uppercase tracking-wide text-slate-500">
                 {lead.category}
+              </span>
+            </div>
+          ) : null}
+          {lead.source ? (
+            <div className="flex items-center gap-2 text-slate-600">
+              <Megaphone className="h-3.5 w-3.5 text-slate-400" />
+              <span className="inline-flex items-center rounded-md border border-sky-200 bg-sky-50 px-1.5 py-0.5 text-[11px] font-medium uppercase tracking-wide text-sky-700">
+                {lead.source}
               </span>
             </div>
           ) : null}

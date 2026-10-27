@@ -3,7 +3,11 @@ import { connectToDatabase } from "@/lib/db/connect";
 import { Lead, type ILead, type LeadDocument } from "@/lib/models/Lead";
 import { User } from "@/lib/models/User";
 import { parseLeadText } from "@/lib/csv";
-import { MAX_IMPORT_ROWS, PAYMENT_ELIGIBLE_STATUSES } from "@/lib/constants";
+import {
+  MAX_IMPORT_ROWS,
+  PAYMENT_ELIGIBLE_STATUSES,
+  normalizeLeadSource,
+} from "@/lib/constants";
 import type { LeadStatus, PaymentMode, PaymentStatus, SessionUser } from "@/lib/types";
 import {
   normalizePhoneNumber,
@@ -124,6 +128,7 @@ export async function createLead(
     phoneNumber: string;
     cityState?: string | null;
     category?: string | null;
+    source?: string | null;
     assignedTo?: string | null;
   },
 ) {
@@ -153,6 +158,7 @@ export async function createLead(
     phoneNumber,
     cityState: input.cityState?.trim() || null,
     category: input.category?.trim() || null,
+    source: normalizeLeadSource(input.source) ?? "Other",
     assignedTo,
     status: "NEW",
   });
@@ -452,6 +458,7 @@ interface AssignAllInput {
     status?: LeadStatus;
     assigned?: string;
     category?: string;
+    source?: string;
     payment?: PaymentStatus;
   };
 }
@@ -644,6 +651,7 @@ export async function importLeads(
       phoneNumber: row.phoneNumber,
       cityState: row.cityState ?? null,
       category: row.category ?? null,
+      source: row.source ?? "Other",
       status: "NEW",
       assignedTo: assignment.get(row.phoneNumber) ?? null,
       followUpDate: null,
@@ -662,6 +670,148 @@ export async function importLeads(
   };
 }
 
+export interface IntakeLeadInput {
+  businessName: string;
+  phoneNumber: string;
+  cityState?: string | null;
+  category?: string | null;
+  source?: string | null;
+}
+
+export interface IntakeLeadResult {
+  created: { id: string; businessName: string; phoneNumber: string }[];
+  skipped: { phoneNumber: string; reason: "duplicate" | "invalid" }[];
+}
+
+/**
+ * Lead intake for external websites (API key auth, no session). Unlike the
+ * admin import it is forgiving: unknown sources become "Other" and duplicate
+ * phone numbers are reported instead of failing the whole batch.
+ */
+export async function intakeLeads(input: {
+  leads: IntakeLeadInput[];
+  autoAssign: boolean;
+}): Promise<IntakeLeadResult> {
+  await connectToDatabase();
+
+  const skipped: IntakeLeadResult["skipped"] = [];
+  const seen = new Set<string>();
+  const rows: {
+    businessName: string;
+    phoneNumber: string;
+    cityState: string | null;
+    category: string | null;
+    source: string;
+  }[] = [];
+
+  for (const lead of input.leads) {
+    const phoneNumber = normalizePhoneNumber(lead.phoneNumber);
+
+    if (phoneNumber.length < 10) {
+      skipped.push({ phoneNumber: lead.phoneNumber, reason: "invalid" });
+      continue;
+    }
+
+    if (seen.has(phoneNumber)) {
+      skipped.push({ phoneNumber, reason: "duplicate" });
+      continue;
+    }
+
+    seen.add(phoneNumber);
+    rows.push({
+      businessName: lead.businessName.trim(),
+      phoneNumber,
+      cityState: lead.cityState?.trim() || null,
+      category: lead.category?.trim() || null,
+      source: normalizeLeadSource(lead.source) ?? "Other",
+    });
+  }
+
+  if (rows.length === 0) {
+    return { created: [], skipped };
+  }
+
+  const existing = await Lead.find({
+    phoneNumber: { $in: rows.map((row) => row.phoneNumber) },
+  })
+    .select("phoneNumber")
+    .lean<{ phoneNumber: string }[]>();
+
+  const existingPhones = new Set(existing.map((row) => row.phoneNumber));
+  const fresh = rows.filter((row) => {
+    if (!existingPhones.has(row.phoneNumber)) return true;
+    skipped.push({ phoneNumber: row.phoneNumber, reason: "duplicate" });
+    return false;
+  });
+
+  if (fresh.length === 0) {
+    return { created: [], skipped };
+  }
+
+  const assignment = new Map<string, Types.ObjectId>();
+
+  if (input.autoAssign) {
+    const reps = await User.find({ role: "SALES_EXEC", isActive: true })
+      .select("_id")
+      .sort({ name: 1 })
+      .lean<{ _id: Types.ObjectId }[]>();
+
+    if (reps.length > 0) {
+      const counts = await Lead.aggregate<
+        { _id: Types.ObjectId; count: number }
+      >([
+        { $match: { assignedTo: { $in: reps.map((rep) => rep._id) } } },
+        { $group: { _id: "$assignedTo", count: { $sum: 1 } } },
+      ]);
+
+      const countMap = new Map(
+        counts.map((row) => [String(row._id), row.count]),
+      );
+      const buckets = reps.map((rep) => ({
+        id: rep._id,
+        count: countMap.get(String(rep._id)) ?? 0,
+      }));
+
+      for (const row of fresh) {
+        let best = buckets[0];
+        for (const bucket of buckets) {
+          if (bucket.count < best.count) best = bucket;
+        }
+        best.count += 1;
+        assignment.set(row.phoneNumber, best.id);
+      }
+    }
+  }
+
+  const now = new Date();
+  const documents = await Lead.insertMany(
+    fresh.map((row) => ({
+      businessName: row.businessName,
+      phoneNumber: row.phoneNumber,
+      cityState: row.cityState,
+      category: row.category,
+      source: row.source,
+      status: "NEW",
+      assignedTo: assignment.get(row.phoneNumber) ?? null,
+      followUpDate: null,
+      notes: [],
+      callLogs: [],
+      createdAt: now,
+      updatedAt: now,
+    })),
+    { ordered: false },
+  );
+
+  return {
+    created: documents.map((document) => ({
+      id: document._id.toString(),
+      businessName: document.businessName,
+      phoneNumber: document.phoneNumber,
+    })),
+    skipped,
+  };
+}
+
 export async function deleteLead(
   user: SessionUser,
   leadId: string,
@@ -675,4 +825,24 @@ export async function deleteLead(
   if (result.deletedCount === 0) {
     throw new ServiceError("Lead not found.", 404);
   }
+}
+
+/**
+ * Hard-deletes selected leads from the database, along with their notes,
+ * call logs, status history, and payment records (embedded subdocuments).
+ */
+export async function bulkDeleteLeads(
+  user: SessionUser,
+  leadIds: string[],
+): Promise<number> {
+  assertAdmin(user);
+  await connectToDatabase();
+
+  if (leadIds.length === 0) return 0;
+
+  const result = await Lead.deleteMany({
+    _id: { $in: leadIds.map((id) => new Types.ObjectId(id)) },
+  });
+
+  return result.deletedCount ?? 0;
 }

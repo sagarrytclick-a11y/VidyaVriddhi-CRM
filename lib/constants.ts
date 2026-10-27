@@ -75,6 +75,104 @@ export const PAYMENT_MODES = [
   "Other",
 ] as const;
 
+/**
+ * Where a lead came from ("head"). Kept as a fixed list so source reporting
+ * stays clean and comparable; "Other" is the escape hatch.
+ */
+export const LEAD_SOURCES = [
+  "Google My Business",
+  "Google Ads",
+  "Meta Ads",
+  "Instagram",
+  "Facebook",
+  "WhatsApp",
+  "Website",
+  "Referral",
+  "Walk-in",
+  "Cold Call",
+  "JustDial",
+  "IndiaMART",
+  "LinkedIn",
+  "YouTube",
+  "Event",
+  "Other",
+] as const;
+
+export type LeadSource = (typeof LEAD_SOURCES)[number];
+
+/**
+ * Common spellings that external sites and CSVs send. Anything unknown is
+ * rejected by validation (or mapped to "Other" by the intake API).
+ */
+const LEAD_SOURCE_ALIASES: Record<string, LeadSource> = {
+  gmb: "Google My Business",
+  "google my business": "Google My Business",
+  "google business": "Google My Business",
+  googlemaps: "Google My Business",
+  "google maps": "Google My Business",
+  "google business profile": "Google My Business",
+  google: "Google Ads",
+  adwords: "Google Ads",
+  "google adwords": "Google Ads",
+  "google ads": "Google Ads",
+  ppc: "Google Ads",
+  meta: "Meta Ads",
+  "meta ads": "Meta Ads",
+  "facebook ads": "Meta Ads",
+  "instagram ads": "Meta Ads",
+  "fb ads": "Meta Ads",
+  insta: "Instagram",
+  instagram: "Instagram",
+  fb: "Facebook",
+  facebook: "Facebook",
+  whatsapp: "WhatsApp",
+  "whats app": "WhatsApp",
+  website: "Website",
+  web: "Website",
+  organic: "Website",
+  seo: "Website",
+  referral: "Referral",
+  reference: "Referral",
+  "word of mouth": "Referral",
+  "walk in": "Walk-in",
+  walkin: "Walk-in",
+  "walk-in": "Walk-in",
+  "cold call": "Cold Call",
+  coldcall: "Cold Call",
+  "cold calling": "Cold Call",
+  justdial: "JustDial",
+  "just dial": "JustDial",
+  indiamart: "IndiaMART",
+  "india mart": "IndiaMART",
+  linkedin: "LinkedIn",
+  youtube: "YouTube",
+  event: "Event",
+  exhibition: "Event",
+  expo: "Event",
+  other: "Other",
+};
+
+/** Resolves free-form text ("gmb", "Meta", "google_ads") to a known source. */
+export function normalizeLeadSource(
+  value: string | null | undefined,
+): LeadSource | null {
+  if (!value) return null;
+
+  const key = value
+    .trim()
+    .toLowerCase()
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ");
+
+  if (!key) return null;
+
+  const exact = LEAD_SOURCES.find(
+    (source) => source.toLowerCase() === key,
+  );
+
+  return exact ?? LEAD_SOURCE_ALIASES[key] ?? null;
+}
+
 /** Payments can only be recorded once the deal reaches the meeting stage. */
 export const PAYMENT_ELIGIBLE_STATUSES = [
   "MEETING",

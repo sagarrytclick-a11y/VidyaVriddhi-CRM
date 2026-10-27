@@ -141,6 +141,7 @@ my-app/
 │   │   ├── leads/[id]/notes/route.ts
 │   │   ├── leads/assign/route.ts
 │   │   ├── leads/import/route.ts
+│   │   ├── leads/intake/route.ts      # API-key intake for external sites
 │   │   ├── users/route.ts
 │   │   └── users/[id]/route.ts
 │   ├── dashboard/
@@ -247,6 +248,8 @@ Users sign in with their **username** (or their email, for accounts that have on
   businessName: string;
   phoneNumber: string;           // normalized digits
   cityState: string | null;
+  category: string | null;
+  source: string | null;         // "head": Google My Business, Google Ads, ...
   status: "NEW" | "CONTACTED" | "FOLLOW_UP" | "MEETING" | "PROPOSAL" | "CONVERTED" | "LOST";
   assignedTo: ObjectId | null;   // ref User
   followUpDate: Date | null;
@@ -272,7 +275,7 @@ Users sign in with their **username** (or their email, for accounts that have on
 }
 ```
 
-Indexes: `businessName`, `phoneNumber`, `status`, `assignedTo`, `followUpDate`, plus compound `{ assignedTo, status }`, `{ followUpDate, status }`, `{ createdAt: -1 }`, and `{ "statusHistory.changedBy": 1, "statusHistory.changedAt": -1 }`.
+Indexes: `businessName`, `phoneNumber`, `status`, `assignedTo`, `followUpDate`, `source`, plus compound `{ assignedTo, status }`, `{ followUpDate, status }`, `{ createdAt: -1 }`, and `{ "statusHistory.changedBy": 1, "statusHistory.changedAt": -1 }`.
 
 ---
 
@@ -283,15 +286,16 @@ Admins can paste raw text or upload a `.csv` / `.txt` file (up to 2 MB).
 **Accepted shapes**
 
 ```csv
-businessName,phoneNumber,cityState,category
-Sharma Dental Clinic,9876543210,Jaipur,Clinic
-Metro Fitness | 9812345678 | Delhi | Gym
-Green Leaf Cafe; 9823456789; Pune; Cafe
+businessName,phoneNumber,cityState,category,source
+Sharma Dental Clinic,9876543210,Jaipur,Clinic,Google My Business
+Metro Fitness | 9812345678 | Delhi | Gym | Meta Ads
+Green Leaf Cafe; 9823456789; Pune; Cafe; Referral
 ```
 
-- Headers are optional. The parser looks for business/company/name, phone/mobile/contact, city/state/location/address, and category/segment/industry/vertical columns.
+- Headers are optional. The parser looks for business/company/name, phone/mobile/contact, city/state/location/address, category/segment/industry/vertical, and source/channel/platform/campaign columns.
 - Category is free text, so you can import any segment you use (for example `School`, `Coaching`, `Clinic`). Existing categories appear in the leads filter and are suggested while importing.
-- For headerless rows the order is: business name, phone, city, category.
+- For headerless rows the order is: business name, phone, city, category, source.
+- `source` records where the lead came from. It is a fixed list: **Google My Business, Google Ads, Meta Ads, Instagram, Facebook, WhatsApp, Website, Referral, Walk-in, Cold Call, JustDial, IndiaMART, LinkedIn, YouTube, Event, Other**. Common spellings (`gmb`, `google_ads`, `facebook ads`, `insta`, …) are normalized; an unrecognized value is stored as `Other`.
 - Delimiters `,`, tab, `|`, and `;` are detected per line.
 - Loose lines such as `Sharma Dental Clinic 9876543210 Jaipur` are also parsed.
 - 10-digit numbers are prefixed with `NEXT_PUBLIC_DEFAULT_COUNTRY_CODE` (default `91`); leading zeros are removed.
@@ -323,12 +327,13 @@ All routes return `{ "data": ... }` on success and `{ "error": "..." }` on failu
 | `POST`   | `/api/leads/:id/notes`   | authenticated     | Add a note.                                    |
 | `POST`   | `/api/leads/assign`      | admin             | Bulk assign/unassign up to 500 leads.          |
 | `POST`   | `/api/leads/import`      | admin             | Import from raw text/CSV.                      |
+| `POST`   | `/api/leads/intake`      | `LEAD_API_KEY`    | External lead intake from another website.     |
 | `GET`    | `/api/users`             | admin             | List users with lead and call counts.          |
 | `POST`   | `/api/users`             | admin             | Create a user.                                 |
 | `PATCH`  | `/api/users/:id`         | admin             | Update name, role, or active state.            |
 | `GET`    | `/api/analytics`         | admin             | Org-wide analytics and rep performance.        |
 
-**Lead list query parameters:** `q`, `status`, `assigned` (`unassigned` or a user id), `category`, `payment` (`UNPAID` | `PARTIAL` | `PAID`), `page`, `limit` (max 100).
+**Lead list query parameters:** `q`, `status`, `assigned` (`unassigned` or a user id), `category`, `source`, `payment` (`UNPAID` | `PARTIAL` | `PAID`), `page`, `limit` (max 100).
 
 **Example**
 
@@ -340,6 +345,56 @@ curl -c cookies.txt -X POST http://localhost:3000/api/auth/login \
 curl -b cookies.txt 'http://localhost:3000/api/leads?status=FOLLOW_UP&page=1'
 ```
 
+### External lead intake (`POST /api/leads/intake`)
+
+A route handler (not a Server Action) for other websites — landing pages, ad platforms, Zapier, Google Apps Script, etc. It does **not** use the session cookie; it authenticates with the `LEAD_API_KEY` environment variable.
+
+Send the key as `x-api-key: <key>` or `Authorization: Bearer <key>`. CORS is open, so a browser form on another origin can call it directly.
+
+**Body:** either one lead object, an array of leads, or `{ "leads": [...], "autoAssign": true }` (max 500 leads per request).
+
+| Field          | Required | Notes                                                    |
+| -------------- | -------- | -------------------------------------------------------- |
+| `businessName` | yes      | 2–200 characters.                                        |
+| `phoneNumber`  | yes      | 10–15 digits; normalized to digits.                      |
+| `cityState`    | no       | City / state / area.                                     |
+| `category`     | no       | Free text segment.                                       |
+| `source`       | no       | Where it came from (aliases accepted). Missing/unknown → `Other`. |
+| `autoAssign`   | no       | `true` distributes new leads to active reps with the lightest load. |
+
+```bash
+curl -X POST http://localhost:3000/api/leads/intake \
+  -H 'content-type: application/json' \
+  -H 'x-api-key: your-lead-api-key' \
+  -d '{
+    "leads": [
+      {
+        "businessName": "Sharma Dental Clinic",
+        "phoneNumber": "9876543210",
+        "cityState": "Jaipur",
+        "category": "Clinic",
+        "source": "Google Ads"
+      }
+    ],
+    "autoAssign": true
+  }'
+```
+
+Success returns `201` (or `200` when nothing new was created):
+
+```json
+{
+  "data": {
+    "created": [{ "id": "...", "businessName": "Sharma Dental Clinic", "phoneNumber": "919876543210" }],
+    "skipped": [],
+    "createdCount": 1,
+    "skippedCount": 0
+  }
+}
+```
+
+Duplicate phone numbers are **not** an error — they come back in `skipped` with `reason: "duplicate"` (invalid numbers use `reason: "invalid"`), so a retried webhook is safe. `401` means a wrong/missing key, `422` a malformed payload, and `503` means `LEAD_API_KEY` is not set on the server.
+
 ### Server Actions
 
 Used by the UI; all are `"use server"` and re-validate the session server-side.
@@ -347,7 +402,7 @@ Used by the UI; all are `"use server"` and re-validate the session server-side.
 | File               | Actions                                                                                                                                                                                                 |
 | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `lib/actions/auth.ts`  | `loginAction`, `logoutAction`                                                                                                                                                                       |
-| `lib/actions/leads.ts` | `updateLeadStatusAction`, `setLeadFollowUpDateAction`, `logCallAction`, `addNoteAction`, `recordPaymentAction`, `setDealValueAction`, `deletePaymentAction`, `assignLeadAction`, `bulkAssignLeadsAction`, `assignAllLeadsAction`, `createLeadAction`, `deleteLeadAction`, `importLeadsAction` |
+| `lib/actions/leads.ts` | `updateLeadStatusAction`, `setLeadFollowUpDateAction`, `logCallAction`, `addNoteAction`, `recordPaymentAction`, `setDealValueAction`, `deletePaymentAction`, `assignLeadAction`, `bulkAssignLeadsAction`, `assignAllLeadsAction`, `createLeadAction`, `deleteLeadAction`, `bulkDeleteLeadsAction`, `importLeadsAction` |
 | `lib/actions/users.ts` | `createUserAction`, `updateUserIncentiveAction`, `toggleUserActiveAction`                                                                                                                                                        |
 
 ---
@@ -355,6 +410,7 @@ Used by the UI; all are `"use server"` and re-validate the session server-side.
 ## Workflow notes
 
 - **Deactivating a rep** immediately blocks sign-in and unassigns all of their leads so they can be redistributed.
+- **Deleting leads is admin-only and always confirmed.** The trash icon on a lead row (or the bulk "Delete" button after selecting leads) opens an "Are you sure?" dialog that warns the lead and its notes, call logs, status history, and payments will be permanently removed. Mark a lead `Lost` instead if history should be kept.
 - **Admins can only manage sales reps.** Only a `SUPER_ADMIN` can create or change `ADMIN` / `SUPER_ADMIN` accounts, change roles, or deactivate an admin.
 - **Incentive settings are super-admin only.** Only a `SUPER_ADMIN` can change a rep's incentive rate or switch incentives on/off; admins created by a super admin start with incentives off until enabled.
 - **Status changes** to anything other than `FOLLOW_UP` clear `followUpDate`.

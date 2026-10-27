@@ -34,6 +34,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
+      data-scroll-behavior="smooth"
       className={`${roboto.variable} h-full antialiased`}
     >
       <body className="min-h-full bg-slate-50 text-slate-900">{children}</body>

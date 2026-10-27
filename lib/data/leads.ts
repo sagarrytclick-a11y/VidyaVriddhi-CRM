@@ -76,6 +76,7 @@ export interface ListLeadFilters {
   status?: LeadStatus;
   assigned?: string;
   category?: string;
+  source?: string;
   payment?: PaymentStatus;
   page?: number;
   pageSize?: number;
@@ -128,6 +129,7 @@ export function mapLead(lead: LeanLead): LeadView {
     phoneNumber: lead.phoneNumber,
     cityState: lead.cityState ?? null,
     category: lead.category ?? null,
+    source: lead.source ?? null,
     status: lead.status,
     assignedTo: lead.assignedTo ? mapUserRef(lead.assignedTo) : null,
     followUpDate: lead.followUpDate
@@ -189,6 +191,10 @@ export function buildLeadFilter(
       `^${escapeRegex(filters.category.trim())}$`,
       "i",
     );
+  }
+
+  if (filters.source) {
+    query.source = filters.source.trim();
   }
 
   if (filters.payment) {

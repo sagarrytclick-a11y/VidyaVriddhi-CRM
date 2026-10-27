@@ -3,14 +3,17 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
+  AlertCircle,
   CalendarClock,
   CheckCircle2,
   ChevronDown,
   MapPin,
+  Megaphone,
   PhoneCall,
   SearchX,
   StickyNote,
   Tag,
+  Trash2,
   UserPlus,
   Users,
   XCircle,
@@ -23,7 +26,7 @@ import { QuickCallModal } from "@/components/crm/QuickCallModal";
 import { StatusSelect } from "@/components/crm/StatusSelect";
 import { WhatsAppIcon } from "@/components/crm/WhatsAppIcon";
 import { WhatsAppModal } from "@/components/crm/WhatsAppModal";
-import { assignAllLeadsAction, bulkAssignLeadsAction } from "@/lib/actions/leads";
+import { assignAllLeadsAction, bulkAssignLeadsAction, bulkDeleteLeadsAction, deleteLeadAction } from "@/lib/actions/leads";
 import { PAYMENT_STATUS_LABELS, PAYMENT_STATUS_STYLES } from "@/lib/constants";
 import type {
   ActionResult,
@@ -53,6 +56,7 @@ export interface LeadTableAssignAll {
     status?: string;
     assigned?: string;
     category?: string;
+    source?: string;
     payment?: string;
   };
 }
@@ -83,6 +87,9 @@ export function LeadTable({
   );
   const [assignAllRep, setAssignAllRep] = useState("");
   const [assignAllPending, startAssignAll] = useTransition();
+  const [deleteLeadId, setDeleteLeadId] = useState<string | null>(null);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [deletePending, startDelete] = useTransition();
 
   const callLead = useMemo(
     () => leads.find((lead) => lead.id === callLeadId) ?? null,
@@ -95,6 +102,10 @@ export function LeadTable({
   const whatsappLead = useMemo(
     () => leads.find((lead) => lead.id === whatsappLeadId) ?? null,
     [leads, whatsappLeadId],
+  );
+  const deleteLead = useMemo(
+    () => leads.find((lead) => lead.id === deleteLeadId) ?? null,
+    [deleteLeadId, leads],
   );
 
   useEffect(() => {
@@ -163,6 +174,7 @@ export function LeadTable({
         status: assignAll.filters.status || null,
         assigned: assignAll.filters.assigned || null,
         category: assignAll.filters.category || null,
+        source: assignAll.filters.source || null,
         payment: assignAll.filters.payment || null,
       });
 
@@ -178,6 +190,38 @@ export function LeadTable({
   function startCall(lead: LeadView) {
     setCallLeadId(lead.id);
     window.location.href = dialerHref(lead.phoneNumber);
+  }
+
+  function confirmDelete() {
+    if (!deleteLead) return;
+
+    startDelete(async () => {
+      const result = await deleteLeadAction(deleteLead.id);
+      handleResult(result);
+
+      if (result.ok) {
+        setDeleteLeadId(null);
+        setSelected((previous) => {
+          const next = new Set(previous);
+          next.delete(deleteLead.id);
+          return next;
+        });
+      }
+    });
+  }
+
+  function confirmBulkDelete() {
+    if (selectedIds.length === 0) return;
+
+    startDelete(async () => {
+      const result = await bulkDeleteLeadsAction(selectedIds);
+      handleResult(result);
+
+      if (result.ok) {
+        setBulkDeleteOpen(false);
+        setSelected(new Set());
+      }
+    });
   }
 
   return (
@@ -234,6 +278,15 @@ export function LeadTable({
               </button>
               <button
                 type="button"
+                onClick={() => setBulkDeleteOpen(true)}
+                disabled={deletePending}
+                className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-rose-200 bg-slate-100 px-3.5 text-sm font-medium text-rose-700 transition hover:bg-rose-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-rose-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                Delete
+              </button>
+              <button
+                type="button"
                 onClick={() => setSelected(new Set())}
                 className="btn-ghost h-9 px-3"
               >
@@ -244,7 +297,7 @@ export function LeadTable({
         ) : null}
 
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1120px] border-collapse">
+          <table className="w-full min-w-[1024px] border-collapse">
             <thead className="border-b border-slate-200 bg-slate-50/70">
               <tr>
                 {isAdmin ? (
@@ -301,7 +354,7 @@ export function LeadTable({
                       </td>
                     ) : null}
                     <td className="table-cell">
-                      <div className="min-w-[190px]">
+                      <div className="min-w-[180px]">
                         <p className="font-medium text-slate-900">
                           {lead.businessName}
                         </p>
@@ -320,6 +373,12 @@ export function LeadTable({
                             <span className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-500">
                               <Tag className="h-2.5 w-2.5" />
                               {lead.category}
+                            </span>
+                          ) : null}
+                          {lead.source ? (
+                            <span className="inline-flex items-center gap-1 rounded-md border border-sky-200 bg-sky-50 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-sky-700">
+                              <Megaphone className="h-2.5 w-2.5" />
+                              {lead.source}
                             </span>
                           ) : null}
                         </div>
@@ -423,6 +482,17 @@ export function LeadTable({
                             </span>
                           ) : null}
                         </button>
+                        {isAdmin ? (
+                          <button
+                            type="button"
+                            onClick={() => setDeleteLeadId(lead.id)}
+                            className="icon-btn text-rose-600 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700"
+                            title={`Delete ${lead.businessName}`}
+                            aria-label={`Delete ${lead.businessName}`}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        ) : null}
                       </div>
                     </td>
                   </tr>
@@ -563,6 +633,105 @@ export function LeadTable({
             This applies to the filtered list, not just this page — all{" "}
             {assignAll?.total.toLocaleString() ?? ""} matching leads are
             updated, no matter how many pages there are.
+          </p>
+        </div>
+      </Modal>
+
+      <Modal
+        open={Boolean(deleteLead)}
+        onClose={() => {
+          if (!deletePending) setDeleteLeadId(null);
+        }}
+        title={`Delete ${deleteLead?.businessName ?? "this lead"}?`}
+        description="This lead will be permanently removed from the database."
+        size="sm"
+        footer={
+          <div className="flex w-full items-center justify-end gap-2">
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() => setDeleteLeadId(null)}
+              disabled={deletePending}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="btn-primary bg-rose-600 hover:bg-rose-700 focus-visible:ring-rose-500/20"
+              onClick={confirmDelete}
+              disabled={deletePending}
+            >
+              <Trash2 className="h-4 w-4" />
+              {deletePending ? "Deleting…" : "Yes, delete lead"}
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-3">
+          <div className="flex items-start gap-2.5 rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-3 text-sm text-rose-800">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+            <p>
+              <span className="font-medium">
+                {deleteLead?.businessName}
+              </span>{" "}
+              ({deleteLead ? formatPhoneNumber(deleteLead.phoneNumber) : ""})
+              will be deleted along with all of its notes, call logs, status
+              history, and payment records. This cannot be undone.
+            </p>
+          </div>
+          <p className="text-xs leading-5 text-slate-500">
+            If you only want to stop working on it, mark the lead as{" "}
+            <span className="font-medium text-slate-700">Lost</span> instead —
+            the history stays intact.
+          </p>
+        </div>
+      </Modal>
+
+      <Modal
+        open={bulkDeleteOpen}
+        onClose={() => {
+          if (!deletePending) setBulkDeleteOpen(false);
+        }}
+        title={`Delete ${selectedIds.length} selected lead${selectedIds.length === 1 ? "" : "s"}?`}
+        description="Selected leads will be permanently removed from the database."
+        size="sm"
+        footer={
+          <div className="flex w-full items-center justify-end gap-2">
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() => setBulkDeleteOpen(false)}
+              disabled={deletePending}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="btn-primary bg-rose-600 hover:bg-rose-700 focus-visible:ring-rose-500/20"
+              onClick={confirmBulkDelete}
+              disabled={deletePending}
+            >
+              <Trash2 className="h-4 w-4" />
+              {deletePending
+                ? "Deleting…"
+                : `Yes, delete ${selectedIds.length} lead${selectedIds.length === 1 ? "" : "s"}`}
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-3">
+          <div className="flex items-start gap-2.5 rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-3 text-sm text-rose-800">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+            <p>
+              All {selectedIds.length} selected lead
+              {selectedIds.length === 1 ? "" : "s"} will be deleted along with
+              their notes, call logs, status history, and payment records. This
+              cannot be undone.
+            </p>
+          </div>
+          <p className="text-xs leading-5 text-slate-500">
+            Only the leads selected on this page are deleted — not the whole
+            filtered list.
           </p>
         </div>
       </Modal>

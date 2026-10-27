@@ -31,7 +31,7 @@ export function AssignSelect({
   }
 
   return (
-    <div className="relative inline-flex max-w-[160px]">
+    <div className="relative inline-flex max-w-[170px]">
       <select
         aria-label="Assign lead"
         value={value}

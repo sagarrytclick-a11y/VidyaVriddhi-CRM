@@ -1,9 +1,11 @@
 import { z } from "zod";
 import {
+  LEAD_SOURCES,
   LEAD_STATUSES,
   PAYMENT_MODES,
   PAYMENT_STATUSES,
   USER_ROLES,
+  normalizeLeadSource,
 } from "@/lib/constants";
 
 export const loginSchema = z
@@ -31,6 +33,16 @@ export const usernameSchema = z
   );
 
 export const leadStatusSchema = z.enum(LEAD_STATUSES);
+
+/**
+ * Accepts "gmb", "google_ads", "Meta" and other common spellings, then
+ * stores the canonical label. Unknown values fail validation.
+ */
+const leadSourceInput = z.preprocess(
+  (value) =>
+    typeof value === "string" ? (normalizeLeadSource(value) ?? value) : value,
+  z.enum(LEAD_SOURCES).optional().nullable(),
+);
 
 export const userRoleSchema = z.enum(USER_ROLES);
 
@@ -96,11 +108,19 @@ export const bulkAssignSchema = z.object({
   assignedTo: objectIdSchema.nullable(),
 });
 
+export const bulkDeleteSchema = z.object({
+  leadIds: z
+    .array(objectIdSchema)
+    .min(1, "Select at least one lead.")
+    .max(500, "Delete at most 500 leads at a time."),
+});
+
 export const assignAllSchema = z.object({
   mode: z.enum(["single", "split"]),
   repId: objectIdSchema.optional().nullable(),
   q: z.string().trim().max(120).optional().nullable(),
   category: z.string().trim().max(100).optional().nullable(),
+  source: z.string().trim().max(60).optional().nullable(),
   payment: z.enum(PAYMENT_STATUSES).optional().nullable(),
   status: leadStatusSchema.optional().nullable(),
   assigned: z.string().trim().max(64).optional().nullable(),
@@ -111,7 +131,31 @@ export const createLeadSchema = z.object({
   phoneNumber: z.string().trim().min(6, "Phone number is required.").max(30),
   cityState: z.string().trim().max(200).optional().nullable(),
   category: z.string().trim().max(100).optional().nullable(),
+  source: leadSourceInput,
   assignedTo: objectIdSchema.optional().nullable(),
+});
+
+/**
+ * External lead intake. Kept separate from `createLeadSchema` because it is
+ * used by API-key clients: `source` is free text (aliases allowed) and a
+ * missing/unknown value becomes "Other" instead of failing the request.
+ */
+export const intakeLeadSchema = z.object({
+  businessName: z.string().trim().min(2, "businessName is required.").max(200),
+  phoneNumber: z.string().trim().min(6, "phoneNumber is required.").max(30),
+  cityState: z.string().trim().max(200).optional().nullable(),
+  category: z.string().trim().max(100).optional().nullable(),
+  source: z.string().trim().max(60).optional().nullable(),
+});
+
+export const intakeRequestSchema = z.object({
+  // Rows are validated one by one so a single bad row does not reject a
+  // whole webhook batch; see `app/api/leads/intake/route.ts`.
+  leads: z
+    .array(z.unknown())
+    .min(1, "Send at least one lead.")
+    .max(500, "Send at most 500 leads per request."),
+  autoAssign: z.boolean().default(false),
 });
 
 export const createUserSchema = z.object({
@@ -145,6 +189,7 @@ export const leadFilterSchema = z.object({
   status: leadStatusSchema.optional(),
   assigned: z.string().trim().max(40).optional(),
   category: z.string().trim().max(100).optional(),
+  source: z.string().trim().max(60).optional(),
   payment: z.enum(PAYMENT_STATUSES).optional(),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(20),

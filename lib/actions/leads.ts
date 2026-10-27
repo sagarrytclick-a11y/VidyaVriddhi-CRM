@@ -7,6 +7,7 @@ import {
   assignAllLeads,
   assignLead,
   bulkAssignLeads,
+  bulkDeleteLeads,
   createLead,
   deleteLead,
   deletePayment,
@@ -29,6 +30,7 @@ import {
   assignAllSchema,
   assignLeadSchema,
   bulkAssignSchema,
+  bulkDeleteSchema,
   createLeadSchema,
   dealValueSchema,
   deletePaymentSchema,
@@ -295,6 +297,7 @@ export async function assignAllLeadsAction(
         status: parsed.data.status ?? undefined,
         assigned: parsed.data.assigned || undefined,
         category: parsed.data.category || undefined,
+        source: parsed.data.source || undefined,
         payment: parsed.data.payment ?? undefined,
       },
     });
@@ -349,6 +352,31 @@ export async function deleteLeadAction(leadId: string): Promise<ActionResult> {
     await deleteLead(user, parsed.data);
     revalidateLeadViews();
     return { ok: true, message: "Lead deleted." };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function bulkDeleteLeadsAction(
+  leadIds: string[],
+): Promise<ActionResult> {
+  try {
+    const user = await currentUserOrThrow();
+    const parsed = bulkDeleteSchema.safeParse({ leadIds });
+
+    if (!parsed.success) {
+      return {
+        ok: false,
+        error: parsed.error.issues[0]?.message ?? "Invalid selection.",
+      };
+    }
+
+    const count = await bulkDeleteLeads(user, parsed.data.leadIds);
+    revalidateLeadViews();
+    return {
+      ok: true,
+      message: `${count} lead${count === 1 ? "" : "s"} deleted.`,
+    };
   } catch (error) {
     return actionError(error);
   }

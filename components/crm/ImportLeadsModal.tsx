@@ -79,10 +79,12 @@ export function ImportLeadsModal() {
                   CSV with <code className="rounded bg-slate-300 px-1">businessName</code>{" "}
                   and <code className="rounded bg-slate-300 px-1">phoneNumber</code>{" "}
                   columns, plus optional{" "}
-                  <code className="rounded bg-slate-300 px-1">cityState</code> and{" "}
-                  <code className="rounded bg-slate-300 px-1">category</code>.
-                  Or one lead per line (name, phone, city, category). Headers
-                  are optional.
+                  <code className="rounded bg-slate-300 px-1">cityState</code>,{" "}
+                  <code className="rounded bg-slate-300 px-1">category</code> and{" "}
+                  <code className="rounded bg-slate-300 px-1">source</code>{" "}
+                  (Google My Business, Google Ads, Meta Ads, Referral, …).
+                  Or one lead per line (name, phone, city, category, source).
+                  Headers are optional.
                 </p>
               </div>
             </div>
@@ -96,7 +98,7 @@ export function ImportLeadsModal() {
               id="import-text"
               name="rawText"
               rows={8}
-              placeholder={"businessName,phoneNumber,cityState,category\nSharma Dental Clinic,9876543210,Jaipur,Clinic\nMetro Fitness | 9812345678 | Delhi | Gym"}
+              placeholder={"businessName,phoneNumber,cityState,category,source\nSharma Dental Clinic,9876543210,Jaipur,Clinic,Google My Business\nMetro Fitness | 9812345678 | Delhi | Gym | Meta Ads"}
               className="textarea font-mono text-xs leading-6"
             />
           </div>

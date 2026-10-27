@@ -83,6 +83,7 @@ export interface LeadView {
   phoneNumber: string;
   cityState: string | null;
   category: string | null;
+  source: string | null;
   status: LeadStatus;
   assignedTo: LeadUserRef | null;
   followUpDate: string | null;

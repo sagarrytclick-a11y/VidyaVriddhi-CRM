@@ -21,6 +21,7 @@ interface LeadsPageProps {
     status?: string;
     assigned?: string;
     category?: string;
+    source?: string;
     payment?: string;
     page?: string;
   }>;
@@ -37,6 +38,7 @@ function buildHref(
     status?: string;
     assigned?: string;
     category?: string;
+    source?: string;
     payment?: string;
   },
   page: number,
@@ -47,6 +49,7 @@ function buildHref(
   if (filters.status) params.set("status", filters.status);
   if (filters.assigned) params.set("assigned", filters.assigned);
   if (filters.category) params.set("category", filters.category);
+  if (filters.source) params.set("source", filters.source);
   if (filters.payment) params.set("payment", filters.payment);
   if (page > 1) params.set("page", String(page));
 
@@ -65,6 +68,7 @@ export default async function LeadsPage({ searchParams }: LeadsPageProps) {
     : undefined;
   const assigned = isAdmin ? params.assigned : undefined;
   const category = params.category?.trim().slice(0, 100) || undefined;
+  const source = params.source?.trim().slice(0, 60) || undefined;
   const payment = PAYMENT_STATUSES.includes(params.payment as PaymentStatus)
     ? (params.payment as PaymentStatus)
     : undefined;
@@ -76,6 +80,7 @@ export default async function LeadsPage({ searchParams }: LeadsPageProps) {
       status,
       assigned,
       category,
+      source,
       payment,
       page,
       pageSize: PAGE_SIZE,
@@ -121,6 +126,7 @@ export default async function LeadsPage({ searchParams }: LeadsPageProps) {
         assigned={assigned}
         category={category}
         categories={categories}
+        source={source}
         payment={payment}
         reps={reps}
         showAssigned={isAdmin}
@@ -148,7 +154,7 @@ export default async function LeadsPage({ searchParams }: LeadsPageProps) {
           isAdmin
             ? {
                 total: result.total,
-                filters: { q, status, assigned, category, payment },
+                filters: { q, status, assigned, category, source, payment },
               }
             : undefined
         }
@@ -165,7 +171,10 @@ export default async function LeadsPage({ searchParams }: LeadsPageProps) {
           <div className="flex items-center gap-2">
             {result.page > 1 ? (
               <Link
-                href={buildHref({ q, status, assigned, category, payment }, result.page - 1)}
+                href={buildHref(
+                  { q, status, assigned, category, source, payment },
+                  result.page - 1,
+                )}
                 className="btn-secondary h-9 px-3"
               >
                 <ChevronLeft className="h-4 w-4" />
@@ -179,7 +188,10 @@ export default async function LeadsPage({ searchParams }: LeadsPageProps) {
             )}
             {result.page < result.totalPages ? (
               <Link
-                href={buildHref({ q, status, assigned, category, payment }, result.page + 1)}
+                href={buildHref(
+                  { q, status, assigned, category, source, payment },
+                  result.page + 1,
+                )}
                 className="btn-secondary h-9 px-3"
               >
                 Next
