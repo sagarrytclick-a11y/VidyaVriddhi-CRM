@@ -1,11 +1,19 @@
 "use client";
 
-import { useActionState } from "react";
-import { AlertCircle, ArrowRight, LockKeyhole, User } from "lucide-react";
+import { useActionState, useState } from "react";
+import {
+  AlertCircle,
+  ArrowRight,
+  Eye,
+  EyeOff,
+  LockKeyhole,
+  User,
+} from "lucide-react";
 import { loginAction } from "@/lib/actions/auth";
 
 export default function LoginForm({ nextPath }: { nextPath?: string }) {
   const [state, formAction, pending] = useActionState(loginAction, undefined);
+  const [showPassword, setShowPassword] = useState(false);
 
   return (
     <form action={formAction} className="space-y-5">
@@ -47,13 +55,27 @@ export default function LoginForm({ nextPath }: { nextPath?: string }) {
           <input
             id="password"
             name="password"
-            type="password"
+            type={showPassword ? "text" : "password"}
             autoComplete="current-password"
             required
             minLength={6}
             placeholder="••••••••"
-            className="input pl-9"
+            className="input pl-9 pr-11"
           />
+          <button
+            type="button"
+            onClick={() => setShowPassword((value) => !value)}
+            aria-label={showPassword ? "Hide password" : "Show password"}
+            aria-pressed={showPassword}
+            title={showPassword ? "Hide password" : "Show password"}
+            className="absolute right-1 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 transition hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/40"
+          >
+            {showPassword ? (
+              <EyeOff className="h-4 w-4" />
+            ) : (
+              <Eye className="h-4 w-4" />
+            )}
+          </button>
         </div>
       </div>
 

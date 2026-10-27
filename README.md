@@ -57,7 +57,7 @@ npm run seed
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) and sign in with the `SEED_ADMIN_*` credentials.
+Open [http://localhost:3000](http://localhost:3000) and sign in with the `SUPER_ADMIN_*` credentials.
 
 `npm run db` starts MongoDB on `127.0.0.1:27017` and stores data in `.mongo-data/`, so records survive restarts. It is a development convenience only — production deployments should set `MONGODB_URI` to Atlas or a managed MongoDB server.
 
@@ -73,10 +73,10 @@ Next.js loads `.env.local` first, then `.env`. The seed script uses the same loa
 | `JWT_SECRET`                      |   yes    | Session signing secret. Use **32+ random characters**.         |
 | `NEXT_PUBLIC_APP_URL`             |    no    | Canonical app URL used for metadata. Defaults to localhost.    |
 | `NEXT_PUBLIC_DEFAULT_COUNTRY_CODE`|    no    | Country code added to 10-digit phone numbers. Defaults to `91`. |
-| `SEED_ADMIN_NAME`                 |  seed    | Name for the initial super admin.                              |
-| `SEED_ADMIN_USERNAME`             |  seed    | Username for the initial super admin (3–32 chars).             |
-| `SEED_ADMIN_EMAIL`                |    no    | Optional email for the initial super admin.                    |
-| `SEED_ADMIN_PASSWORD`             |  seed    | Password (8+ characters) for the initial super admin.          |
+| `SUPER_ADMIN_NAME`                |    no    | Display name for the super admin. Defaults to `Super Admin`.   |
+| `SUPER_ADMIN_USERNAME`            |   yes    | Super admin username (3–32 chars).                             |
+| `SUPER_ADMIN_EMAIL`               |    no    | Optional email for the super admin.                            |
+| `SUPER_ADMIN_PASSWORD`            |   yes    | Super admin password (8+ characters).                          |
 
 Generate a secret with:
 
@@ -84,9 +84,11 @@ Generate a secret with:
 openssl rand -base64 32
 ```
 
-`npm run seed` upgrades an existing account with the same username (or email) to `SUPER_ADMIN` and reactivates it, so it is safe to re-run.
+> **Values containing `#` must be quoted** (`SUPER_ADMIN_PASSWORD="abc#123"`). Unquoted, dotenv treats `#` and everything after it as a comment, which silently truncates the value.
 
-The database starts empty — sign in as the super admin and create your sales reps from the Team page. No demo leads or demo accounts are seeded.
+The super admin is **defined in the environment**, not created in the UI. Signing in with `SUPER_ADMIN_USERNAME` + `SUPER_ADMIN_PASSWORD` provisions (or repairs) that account on the spot, so a brand-new or reset database still lets the owner in. Changing the env password and signing in again rotates it. `npm run seed` does the same thing ahead of time and is safe to re-run.
+
+The database starts empty — sign in as the super admin and create your sales reps from the Team page. New team members are always sales reps; there is no admin/role picker. No demo leads or demo accounts are seeded.
 
 ### Scripts
 
@@ -456,7 +458,7 @@ Rules enforced in the service layer:
 | `MONGODB_URI is missing`             | Create `.env.local` from `.env.example`.                            |
 | `ECONNREFUSED 127.0.0.1:27017`       | Start MongoDB, or run `npm run db` in a separate terminal.          |
 | `JWT_SECRET is missing or too short` | Use 32+ random characters.                                          |
-| Cannot sign in after seeding         | Confirm `SEED_ADMIN_USERNAME` / `SEED_ADMIN_PASSWORD`; re-run `npm run seed`. |
+| Cannot sign in as the super admin | Confirm `SUPER_ADMIN_USERNAME` / `SUPER_ADMIN_PASSWORD` in `.env`; the account is provisioned automatically on the next sign-in (or run `npm run seed`). |
 | Import says "No valid leads found"   | Ensure each row has a business name and a 10–15 digit phone number. |
 | PDF upload rejected                  | Copy the PDF text and paste it instead.                             |
 | Rep sees no leads                    | Leads must be assigned; deactivation unassigns leads.               |

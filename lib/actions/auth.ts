@@ -3,7 +3,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { connectToDatabase, isDatabaseConnectionError } from "@/lib/db/connect";
-import { findUserForLogin } from "@/lib/auth/credentials";
+import { authenticateUser } from "@/lib/auth/credentials";
 import { createSessionToken } from "@/lib/auth/jwt";
 import {
   SESSION_COOKIE,
@@ -37,31 +37,27 @@ export async function loginAction(
 
   const loginIdentifier = parsed.data.identifier ?? parsed.data.email ?? "";
 
-  let user;
+  let result;
 
   try {
     await connectToDatabase();
-    user = await findUserForLogin(loginIdentifier);
+    result = await authenticateUser(loginIdentifier, parsed.data.password);
   } catch (error) {
     if (isDatabaseConnectionError(error)) {
       return {
         error:
-          "Cannot reach the database. Start it with `npm run db` (or check MONGODB_URI), then try again.",
+          "Cannot reach the database. Check MONGODB_URI and your network, then try again.",
       };
     }
 
     throw error;
   }
 
-  if (!user || !user.isActive) {
+  if (!result.ok) {
     return { error: "Invalid username or password." };
   }
 
-  const passwordMatches = await user.comparePassword(parsed.data.password);
-
-  if (!passwordMatches) {
-    return { error: "Invalid username or password." };
-  }
+  const { user } = result;
 
   const token = await createSessionToken({
     id: user._id.toString(),

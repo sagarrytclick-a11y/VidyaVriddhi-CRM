@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/db/connect";
-import { findUserForLogin } from "@/lib/auth/credentials";
+import { authenticateUser } from "@/lib/auth/credentials";
 import { createSessionToken } from "@/lib/auth/jwt";
 import {
   SESSION_COOKIE,
@@ -23,19 +23,16 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   await connectToDatabase();
 
-  const user = await findUserForLogin(
+  const result = await authenticateUser(
     parsed.data.identifier ?? parsed.data.email ?? "",
+    parsed.data.password,
   );
 
-  if (!user || !user.isActive) {
+  if (!result.ok) {
     return jsonError("Invalid username or password.", 401);
   }
 
-  const passwordMatches = await user.comparePassword(parsed.data.password);
-
-  if (!passwordMatches) {
-    return jsonError("Invalid username or password.", 401);
-  }
+  const { user } = result;
 
   const token = await createSessionToken({
     id: user._id.toString(),

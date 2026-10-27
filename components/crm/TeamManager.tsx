@@ -321,7 +321,7 @@ export function TeamManager({
     return () => window.clearTimeout(timer);
   }, [toast]);
 
-  const canCreateAdmin = currentUser.role === "SUPER_ADMIN";
+  const canSetIncentive = currentUser.role === "SUPER_ADMIN";
 
   function confirmDeactivate() {
     if (!deactivateTarget) return;
@@ -456,31 +456,15 @@ export function TeamManager({
                 className="input"
               />
             </div>
-            <div>
-              <label htmlFor="member-role" className="label">
-                Role
-              </label>
-              <select
-                id="member-role"
-                name="role"
-                defaultValue="SALES_EXEC"
-                className="input"
-              >
-                <option value="SALES_EXEC">Sales exec</option>
-                {canCreateAdmin ? <option value="ADMIN">Admin</option> : null}
-                {canCreateAdmin ? (
-                  <option value="SUPER_ADMIN">Super admin</option>
-                ) : null}
-              </select>
+            <div className="flex items-end">
+              <p className="text-xs leading-5 text-slate-500">
+                New accounts are always sales reps. They only see the leads
+                assigned to them.
+              </p>
             </div>
           </div>
 
-          <p className="text-xs leading-5 text-slate-500">
-            Sales execs only see leads assigned to them. Admins can import,
-            assign, and view organization-wide reporting.
-          </p>
-
-          {canCreateAdmin ? (
+          {canSetIncentive ? (
             <>
               <div>
                 <label htmlFor="member-incentive" className="label">

@@ -35,7 +35,9 @@ export async function createUserAction(
       name: formData.get("name"),
       username: formData.get("username"),
       password: formData.get("password"),
-      role: formData.get("role"),
+      // The UI only creates sales reps; admin accounts come from the
+      // environment (SUPER_ADMIN_*), not from this form.
+      role: "SALES_EXEC",
       // These fields are hidden for non-super-admins; leave them undefined so
       // the schema defaults apply instead of coercing a missing value to 0.
       incentiveRate: formData.get("incentiveRate") ?? undefined,
