@@ -1,26 +1,188 @@
 @import "tailwindcss";
 
+/*
+ * Vidya Vriddhi — dark theme.
+ *
+ * The slate and accent scales are remapped for a black interface:
+ * low numbers (50-300) become dark surfaces and borders, high numbers
+ * (400-950) become light text. Accent 50/100/200 steps become dark tints
+ * so badges and soft panels stay readable on black.
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #09090b;
+  --foreground: #f4f4f7;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-roboto), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* Neutral scale, tuned for a black interface */
+  --color-slate-50: #09090b;
+  --color-slate-100: #121216;
+  --color-slate-200: #232329;
+  --color-slate-300: #31313a;
+  --color-slate-400: #64646e;
+  --color-slate-500: #8b8b96;
+  --color-slate-600: #b1b1bb;
+  --color-slate-700: #c6c6cf;
+  --color-slate-800: #e3e3e9;
+  --color-slate-900: #f4f4f7;
+  --color-slate-950: #ffffff;
+
+  /* Orange — primary accent (brand) */
+  --color-orange-50: #2a1603;
+  --color-orange-100: #3b2005;
+  --color-orange-200: #5a3108;
+  --color-orange-300: #fdba74;
+  --color-orange-700: #fb923c;
+  --color-orange-800: #fdba74;
+  --color-orange-900: #ffedd5;
+
+  /* Emerald — kept for status chips (converted/active) and WhatsApp notes */
+  --color-emerald-50: #07271c;
+  --color-emerald-100: #0b3527;
+  --color-emerald-200: #14503a;
+  --color-emerald-300: #6ee7b7;
+  --color-emerald-700: #34d399;
+  --color-emerald-800: #6ee7b7;
+  --color-emerald-900: #a7f3d0;
+
+  /* Sky */
+  --color-sky-50: #062330;
+  --color-sky-100: #0a3042;
+  --color-sky-200: #0f4a66;
+  --color-sky-700: #7dd3fc;
+  --color-sky-800: #bae6fd;
+  --color-sky-900: #e0f2fe;
+
+  /* Amber */
+  --color-amber-50: #271a03;
+  --color-amber-100: #382505;
+  --color-amber-200: #573a08;
+  --color-amber-700: #fcd34d;
+  --color-amber-800: #fde68a;
+  --color-amber-900: #fef3c7;
+
+  /* Violet */
+  --color-violet-50: #1e1332;
+  --color-violet-100: #2a1b47;
+  --color-violet-200: #412a6b;
+  --color-violet-700: #c4b5fd;
+  --color-violet-800: #ddd6fe;
+  --color-violet-900: #ede9fe;
+
+  /* Rose */
+  --color-rose-50: #2b0e13;
+  --color-rose-100: #3d141c;
+  --color-rose-200: #5c2030;
+  --color-rose-700: #fda4af;
+  --color-rose-800: #fecdd3;
+  --color-rose-900: #ffe4e6;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  scroll-behavior: smooth;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-roboto), ui-sans-serif, system-ui, sans-serif;
+}
+
+::selection {
+  background: rgba(249, 115, 22, 0.35);
+  color: #fff7ed;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #31313a transparent;
+}
+
+@layer components {
+  .card {
+    @apply rounded-2xl border border-slate-200 bg-slate-100 shadow-[0_1px_2px_rgba(0,0,0,0.4)];
+  }
+
+  .label {
+    @apply mb-1.5 block text-xs font-medium tracking-wide text-slate-500;
+  }
+
+  .input {
+    @apply h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400;
+  }
+
+  .textarea {
+    @apply w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 disabled:cursor-not-allowed disabled:bg-slate-100;
+  }
+
+  .btn {
+    @apply inline-flex h-10 items-center justify-center gap-2 rounded-xl px-4 text-sm font-medium transition focus:outline-none focus-visible:ring-4 focus-visible:ring-orange-500/20 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .btn-primary {
+    @apply inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-orange-600 px-4 text-sm font-medium text-white shadow-sm transition hover:bg-orange-500 focus:outline-none focus-visible:ring-4 focus-visible:ring-orange-500/20 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .btn-secondary {
+    @apply inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-100 px-4 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-200 focus:outline-none focus-visible:ring-4 focus-visible:ring-orange-500/20 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .btn-ghost {
+    @apply inline-flex h-10 items-center justify-center gap-2 rounded-xl px-4 text-sm font-medium text-slate-600 transition hover:bg-slate-100 focus:outline-none focus-visible:ring-4 focus-visible:ring-orange-500/20 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .btn-danger {
+    @apply inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-rose-200 bg-slate-100 px-4 text-sm font-medium text-rose-700 transition hover:bg-rose-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-rose-500/20 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .icon-btn {
+    @apply inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-slate-100 text-slate-500 transition hover:border-slate-300 hover:bg-slate-200 hover:text-slate-900 focus:outline-none focus-visible:ring-4 focus-visible:ring-orange-500/20 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .badge {
+    @apply inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium;
+  }
+
+  .table-head {
+    @apply px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500;
+  }
+
+  .table-cell {
+    @apply px-4 py-3.5 align-middle text-sm text-slate-600;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 160ms ease-out;
+}
+
+@keyframes slide-in {
+  from {
+    transform: translateX(24px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-in {
+  animation: slide-in 200ms ease-out;
 }
